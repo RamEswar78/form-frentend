@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-type DataRow = { [key: string]: any };
+// type DataRow = { [key: string]: any };
 
 const API_URL = "https://form-backend-2024.onrender.com/fetch";
 
@@ -296,3 +296,4 @@ const Table: React.FC = () => {
 };
 
 export default Table;
+
