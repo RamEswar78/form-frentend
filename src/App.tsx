@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import  { useState } from "react";
 import Form from "./components/Form";
 import Table from "./components/Table";
 
@@ -41,3 +41,4 @@ export default function App() {
     </div>
   );
 }
+
