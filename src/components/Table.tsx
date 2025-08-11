@@ -13,7 +13,7 @@ const Table: React.FC = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [fields, setFields] = useState<string[]>([]);
- // const [dateFields, setDateFields] = useState<string[]>([]);
+  const [dateFields, setDateFields] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [editRow, setEditRow] = useState<DataRow | null>(null);
   const [editValues, setEditValues] = useState<DataRow>({});
@@ -22,6 +22,7 @@ const Table: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log(dateFields)
         const res = await fetch(API_URL);
         const jsonData = await res.json();
         setData(jsonData);
@@ -296,5 +297,6 @@ const Table: React.FC = () => {
 };
 
 export default Table;
+
 
 
