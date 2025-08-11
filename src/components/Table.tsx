@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-// type DataRow = { [key: string]: any };
+type DataRow = { [key: string]: any };
 
 const API_URL = "https://form-backend-2024.onrender.com/fetch";
 
@@ -13,7 +13,7 @@ const Table: React.FC = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [fields, setFields] = useState<string[]>([]);
-  const [dateFields, setDateFields] = useState<string[]>([]);
+ // const [dateFields, setDateFields] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [editRow, setEditRow] = useState<DataRow | null>(null);
   const [editValues, setEditValues] = useState<DataRow>({});
@@ -296,4 +296,5 @@ const Table: React.FC = () => {
 };
 
 export default Table;
+
 
