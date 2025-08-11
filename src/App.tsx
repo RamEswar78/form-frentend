@@ -34,7 +34,7 @@ export default function App() {
       </div>
 
       {/* Component View */}
-      <div className="max-w-5xl mx-auto">
+      <div className="w-full mx-auto">
         {view === "form" && <Form />}
         {view === "table" && <Table />}
       </div>

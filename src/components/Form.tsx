@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 
 type DropdownOption = "Yes" | "No" | "Maybe" | "Don't know";
@@ -17,6 +17,7 @@ interface FormData {
   twoWInsuranceExpiry: string;
   fourWInsuranceExpiry: string;
   referredBy: string;
+  createdAt?: string;
 }
 
 const dropdownOptions: DropdownOption[] = ["Yes", "No", "Maybe", "Don't know"];
@@ -40,6 +41,22 @@ const Form: React.FC = () => {
 
   const [formData, setFormData] = useState<FormData>(initialFormState);
   const [loading, setLoading] = useState(false);
+  const [allData, setAllData] = useState<FormData[]>([]);
+
+  const fetchData = async () => {
+    try {
+      const res = await axios.get(
+        "https://form-backend-2024.onrender.com/fetch"
+      );
+      setAllData(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -53,8 +70,7 @@ const Form: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (loading) return; // Prevent double submit
+    if (loading) return;
 
     setLoading(true);
     try {
@@ -64,7 +80,8 @@ const Form: React.FC = () => {
       );
       console.log("Form submitted successfully:", response.data);
       alert("Form submitted successfully!");
-      setFormData(initialFormState); // Reset form
+      setFormData(initialFormState);
+      fetchData();
     } catch (error) {
       console.error("Error submitting form:", error);
       alert("Error submitting form.");
@@ -73,11 +90,25 @@ const Form: React.FC = () => {
     }
   };
 
+  const deleteRecord = async (phone: string) => {
+    if (!window.confirm("Are you sure you want to delete this record?")) return;
+    try {
+      await axios.delete(
+        `https://form-backend-2024.onrender.com/delete/${phone}`
+      );
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting record");
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gray-900 text-white p-6 m-auto max-w-4xl">
+      {/* Form */}
       <form
         onSubmit={handleSubmit}
-        className="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-4"
+        className="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-4 mb-8"
       >
         <h2 className="text-2xl font-bold text-center mb-6 md:col-span-2">
           Insurance & Investment Form
@@ -155,19 +186,16 @@ const Form: React.FC = () => {
             ))}
           </select>
         </div>
-
-        {formData.healthInsurance === "Yes" && (
-          <div>
-            <label className="block mb-1">Health Insurance Expiry</label>
-            <input
-              type="date"
-              name="healthInsuranceExpiry"
-              value={formData.healthInsuranceExpiry}
-              onChange={handleChange}
-              className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-400"
-            />
-          </div>
-        )}
+        <div>
+          <label className="block mb-1">Health Insurance Expiry</label>
+          <input
+            type="date"
+            name="healthInsuranceExpiry"
+            value={formData.healthInsuranceExpiry}
+            onChange={handleChange}
+            className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-400"
+          />
+        </div>
 
         {/* Term Insurance */}
         <div>
@@ -185,21 +213,18 @@ const Form: React.FC = () => {
             ))}
           </select>
         </div>
+        <div>
+          <label className="block mb-1">Term Insurance Expiry</label>
+          <input
+            type="date"
+            name="termInsuranceExpiry"
+            value={formData.termInsuranceExpiry}
+            onChange={handleChange}
+            className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-400"
+          />
+        </div>
 
-        {formData.termInsurance === "Yes" && (
-          <div>
-            <label className="block mb-1">Term Insurance Expiry</label>
-            <input
-              type="date"
-              name="termInsuranceExpiry"
-              value={formData.termInsuranceExpiry}
-              onChange={handleChange}
-              className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-400"
-            />
-          </div>
-        )}
-
-        {/* 2-Wheeler */}
+        {/* Two Wheeler */}
         <div>
           <label className="block mb-1">2-Wheeler Insurance</label>
           <select
@@ -215,21 +240,18 @@ const Form: React.FC = () => {
             ))}
           </select>
         </div>
+        <div>
+          <label className="block mb-1">2-Wheeler Insurance Expiry</label>
+          <input
+            type="date"
+            name="twoWInsuranceExpiry"
+            value={formData.twoWInsuranceExpiry}
+            onChange={handleChange}
+            className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-400"
+          />
+        </div>
 
-        {formData.twoWheeler === "Yes" && (
-          <div>
-            <label className="block mb-1">2-Wheeler Insurance Expiry</label>
-            <input
-              type="date"
-              name="twoWInsuranceExpiry"
-              value={formData.twoWInsuranceExpiry}
-              onChange={handleChange}
-              className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-400"
-            />
-          </div>
-        )}
-
-        {/* 4-Wheeler */}
+        {/* Four Wheeler */}
         <div>
           <label className="block mb-1">4-Wheeler Insurance</label>
           <select
@@ -245,19 +267,16 @@ const Form: React.FC = () => {
             ))}
           </select>
         </div>
-
-        {formData.fourWheeler === "Yes" && (
-          <div>
-            <label className="block mb-1">4-Wheeler Insurance Expiry</label>
-            <input
-              type="date"
-              name="fourWInsuranceExpiry"
-              value={formData.fourWInsuranceExpiry}
-              onChange={handleChange}
-              className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-400"
-            />
-          </div>
-        )}
+        <div>
+          <label className="block mb-1">4-Wheeler Insurance Expiry</label>
+          <input
+            type="date"
+            name="fourWInsuranceExpiry"
+            value={formData.fourWInsuranceExpiry}
+            onChange={handleChange}
+            className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-400"
+          />
+        </div>
 
         {/* Referred By */}
         <div className="md:col-span-2">
@@ -271,7 +290,7 @@ const Form: React.FC = () => {
           />
         </div>
 
-        {/* Submit Button */}
+        {/* Submit */}
         <div className="md:col-span-2">
           <button
             type="submit"
@@ -286,6 +305,50 @@ const Form: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse border border-gray-600">
+          <thead>
+            <tr>
+              <th className="border border-gray-600 p-2">Name</th>
+              <th className="border border-gray-600 p-2">Email</th>
+              <th className="border border-gray-600 p-2">Phone</th>
+              <th className="border border-gray-600 p-2">Created At</th>
+              <th className="border border-gray-600 p-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allData.map((item) => (
+              <tr key={item.phone}>
+                <td className="border border-gray-600 p-2">{item.name}</td>
+                <td className="border border-gray-600 p-2">{item.email}</td>
+                <td className="border border-gray-600 p-2">{item.phone}</td>
+                <td className="border border-gray-600 p-2">
+                  {item.createdAt
+                    ? new Date(item.createdAt).toLocaleDateString()
+                    : ""}
+                </td>
+                <td className="border border-gray-600 p-2">
+                  <button
+                    onClick={() => deleteRecord(item.phone)}
+                    className="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-white"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {allData.length === 0 && (
+              <tr>
+                <td colSpan={5} className="text-center p-4">
+                  No records found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

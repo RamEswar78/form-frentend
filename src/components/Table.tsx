@@ -2,15 +2,21 @@ import React, { useEffect, useState } from "react";
 
 type DataRow = { [key: string]: any };
 
-const API_URL = " https://form-backend-2024.onrender.com/fetch"; // Change to your backend endpoint
+const API_URL = "https://form-backend-2024.onrender.com/fetch";
 
 const Table: React.FC = () => {
   const [data, setData] = useState<DataRow[]>([]);
   const [filteredData, setFilteredData] = useState<DataRow[]>([]);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<{ [key: string]: string }>({});
+  const [searchName, setSearchName] = useState("");
+  const [searchEmail, setSearchEmail] = useState("");
+  const [searchPhone, setSearchPhone] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [fields, setFields] = useState<string[]>([]);
+  const [dateFields, setDateFields] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editRow, setEditRow] = useState<DataRow | null>(null);
+  const [editValues, setEditValues] = useState<DataRow>({});
 
   // Fetch data from API
   useEffect(() => {
@@ -20,8 +26,17 @@ const Table: React.FC = () => {
         const jsonData = await res.json();
         setData(jsonData);
         setFilteredData(jsonData);
+
         if (jsonData.length > 0) {
-          setFields(Object.keys(jsonData[0]));
+          const allFields = Object.keys(jsonData[0]);
+          setFields(allFields);
+
+          // Detect date fields by checking if the first row's value parses as a valid date
+          const detectedDates = allFields.filter((field) => {
+            const val = jsonData[0][field];
+            return val && !isNaN(new Date(val).getTime());
+          });
+          setDateFields(detectedDates);
         }
       } catch (err) {
         console.error("Error fetching data:", err);
@@ -32,31 +47,95 @@ const Table: React.FC = () => {
     fetchData();
   }, []);
 
-  // Apply filters and search
+  // Apply filters
   useEffect(() => {
     let temp = [...data];
 
-    if (search) {
+    // Text search filters
+    if (searchName) {
       temp = temp.filter((row) =>
-        fields.some((field) =>
-          String(row[field] || "")
-            .toLowerCase()
-            .includes(search.toLowerCase())
-        )
+        String(row.name || "")
+          .toLowerCase()
+          .includes(searchName.toLowerCase())
+      );
+    }
+    if (searchEmail) {
+      temp = temp.filter((row) =>
+        String(row.email || "")
+          .toLowerCase()
+          .includes(searchEmail.toLowerCase())
+      );
+    }
+    if (searchPhone) {
+      temp = temp.filter((row) =>
+        String(row.phone || "")
+          .toLowerCase()
+          .includes(searchPhone.toLowerCase())
       );
     }
 
-    Object.entries(filters).forEach(([field, value]) => {
-      if (value) {
-        temp = temp.filter((row) => String(row[field]) === value);
-      }
-    });
+    // Date filtering — only for healthInsuranceExpiry
+    if (startDate || endDate) {
+      const start = startDate ? new Date(startDate + "T00:00:00") : null;
+      const end = endDate ? new Date(endDate + "T23:59:59") : null;
+
+      temp = temp.filter((row) => {
+        if (!row.healthInsuranceExpiry) return false;
+        const expiryDate = new Date(row.healthInsuranceExpiry);
+        if (isNaN(expiryDate.getTime())) return false;
+        if (start && expiryDate < start) return false;
+        if (end && expiryDate > end) return false;
+        return true;
+      });
+    }
 
     setFilteredData(temp);
-  }, [search, filters, data, fields]);
+  }, [searchName, searchEmail, searchPhone, startDate, endDate, data]);
 
-  const handleFilterChange = (field: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [field]: value }));
+  // Delete row
+  const handleDelete = async (phone: string) => {
+    if (!window.confirm("Are you sure you want to delete this entry?")) return;
+    try {
+      await fetch(`https://form-backend-2024.onrender.com/delete/${phone}`, {
+        method: "DELETE",
+      });
+      setData((prev) => prev.filter((row) => row.phone !== phone));
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
+  };
+
+  // Start editing
+  const handleEdit = (row: DataRow) => {
+    setEditRow(row);
+    setEditValues(row);
+  };
+
+  // Save changes
+  const handleSave = async () => {
+    if (!editRow) return;
+    try {
+      await fetch(
+        `https://form-backend-2024.onrender.com/update/${editRow.phone}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editValues),
+        }
+      );
+      setData((prev) =>
+        prev.map((r) => (r.phone === editRow.phone ? editValues : r))
+      );
+      setEditRow(null);
+    } catch (err) {
+      console.error("Update error:", err);
+    }
+  };
+
+  // Cancel editing
+  const handleCancel = () => {
+    setEditRow(null);
+    setEditValues({});
   };
 
   if (loading) {
@@ -64,43 +143,63 @@ const Table: React.FC = () => {
   }
 
   return (
-    <div className="p-6 bg-gray-900 min-h-screen text-gray-200">
+    <div className="p-6 bg-gray-900  w-full text-gray-200">
       <h2 className="text-2xl font-bold mb-4 text-center">API Data Table</h2>
 
-      {/* Search Bar */}
-      <input
-        type="text"
-        placeholder="Search..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full p-2 mb-4 rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
+      {/* Search Fields */}
+      <div className="flex flex-wrap gap-4 mb-4">
+        <input
+          type="text"
+          placeholder="Search by Name..."
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200"
+        />
+        <input
+          type="text"
+          placeholder="Search by Email..."
+          value={searchEmail}
+          onChange={(e) => setSearchEmail(e.target.value)}
+          className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200"
+        />
+        <input
+          type="text"
+          placeholder="Search by Phone..."
+          value={searchPhone}
+          onChange={(e) => setSearchPhone(e.target.value)}
+          className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200"
+        />
+      </div>
 
-      {/* Filters */}
-      {fields.length > 0 && (
-        <div className="flex flex-wrap gap-3 mb-4">
-          {fields.map((field) => (
-            <select
-              key={field}
-              value={filters[field] || ""}
-              onChange={(e) => handleFilterChange(field, e.target.value)}
-              className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All {field}</option>
-              {[...new Set(data.map((row) => row[field]))].map((val, idx) => (
-                <option key={idx} value={val}>
-                  {val}
-                </option>
-              ))}
-            </select>
-          ))}
+      {/* Date Range */}
+      <div className="flex gap-4 mb-4">
+        <div></div>
+        <div>
+          <label className="block text-sm mb-1">
+            healthInsuranceExpiry Start Date
+          </label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200"
+          />
         </div>
-      )}
+        <div>
+          <label className="block text-sm mb-1">End Date</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200"
+          />
+        </div>
+      </div>
 
       {/* Table */}
       {fields.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="min-w-full border border-gray-700 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto w-full">
+          <table className="min-w-full w-full border border-gray-700 rounded-lg overflow-hidden">
             <thead className="bg-gray-800">
               <tr>
                 {fields.map((field) => (
@@ -111,6 +210,9 @@ const Table: React.FC = () => {
                     {field}
                   </th>
                 ))}
+                <th className="px-4 py-2 border-b border-gray-700 text-gray-300">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -121,11 +223,68 @@ const Table: React.FC = () => {
                       key={field}
                       className="px-4 py-2 border-b border-gray-700"
                     >
-                      {String(row[field] ?? "")}
+                      {editRow?.phone === row.phone ? (
+                        <input
+                          type="text"
+                          value={editValues[field] ?? ""}
+                          onChange={(e) =>
+                            setEditValues({
+                              ...editValues,
+                              [field]: e.target.value,
+                            })
+                          }
+                          className="p-1 rounded bg-gray-700 border border-gray-600 text-gray-200 w-full"
+                        />
+                      ) : (
+                        String(row[field] ?? "")
+                      )}
                     </td>
                   ))}
+                  <td className="px-4 py-2 border-b border-gray-700 space-x-2">
+                    {editRow?.phone === row.phone ? (
+                      <>
+                        <button
+                          onClick={handleSave}
+                          className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancel}
+                          className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleEdit(row)}
+                          className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(row.phone)}
+                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </td>
                 </tr>
               ))}
+              {filteredData.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={fields.length + 1}
+                    className="text-center text-gray-400 py-4"
+                  >
+                    No matching records found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
