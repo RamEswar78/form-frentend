@@ -15,7 +15,7 @@ const Signup: React.FC = () => {
     setSuccess("");
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/signup", {
+      const res = await fetch("https://form-backend-2024.onrender.com/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),

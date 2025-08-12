@@ -18,7 +18,7 @@ const Login: React.FC<LoginProps> = ({ setIsLoggedIn }) => {
     setSuccess("");
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/login", {
+      const res = await fetch("https://form-backend-2024.onrender.com/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
