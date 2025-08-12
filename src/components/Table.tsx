@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 type DataRow = { [key: string]: any };
 
@@ -22,6 +22,7 @@ const Table: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log(dateFields)
         const res = await fetch(API_URL);
         const jsonData = await res.json();
         setData(jsonData);
@@ -296,3 +297,6 @@ const Table: React.FC = () => {
 };
 
 export default Table;
+
+
+
