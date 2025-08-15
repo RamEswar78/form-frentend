@@ -1,4 +1,4 @@
-import  { useState } from "react";
+import { useState } from "react";
 import Form from "./components/Form";
 import Table from "./components/Table";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
@@ -29,7 +29,7 @@ export default function App() {
     <>
       <Routes>
         <Route path="/login" element={<Login setIsLoggedIn={handleLogin} />} />
-        <Route path="/signup" element={<Signup />} />
+        <Route path="/signup" element={<Login setIsLoggedIn={handleLogin} />} />
         <Route
           path="/form"
           element={
@@ -103,4 +103,3 @@ export default function App() {
     </>
   );
 }
-
