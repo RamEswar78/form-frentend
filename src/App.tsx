@@ -3,7 +3,7 @@ import Form from "./components/Form";
 import Table from "./components/Table";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import Login from "./components/Login";
-import Signup from "./components/Signup";
+// import Signup from "./components/Signup";
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
