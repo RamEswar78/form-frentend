@@ -1,43 +1,69 @@
 import { useEffect, useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  TableSortLabel,
+  IconButton,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+} from "@mui/material";
+import { Edit, Delete, FilterList } from "@mui/icons-material";
 
 type DataRow = { [key: string]: any };
 
 const API_URL = "https://form-backend-2024.onrender.com/fetch";
+const UPDATE_URL = "https://form-backend-2024.onrender.com/update";
 
-const Table: React.FC = () => {
+type Order = "asc" | "desc";
+
+// Convert camelCase to Readable Format
+const formatHeader = (key: string) => {
+  return key
+    .replace(/([A-Z])/g, " $1") // insert space before caps
+    .replace(/^./, (str) => str.toUpperCase()); // capitalize first letter
+};
+
+const DataTable: React.FC = () => {
   const [data, setData] = useState<DataRow[]>([]);
   const [filteredData, setFilteredData] = useState<DataRow[]>([]);
+  const [fields, setFields] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Sorting
+  const [order, setOrder] = useState<Order>("asc");
+  const [orderBy, setOrderBy] = useState<string>("");
+
+  // Filters
+  const [filterOpen, setFilterOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [searchEmail, setSearchEmail] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [fields, setFields] = useState<string[]>([]);
-  const [dateFields, setDateFields] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editRow, setEditRow] = useState<DataRow | null>(null);
-  const [editValues, setEditValues] = useState<DataRow>({});
 
-  // Fetch data from API
+  // Edit
+  const [editOpen, setEditOpen] = useState(false);
+  const [currentRow, setCurrentRow] = useState<DataRow | null>(null);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log(dateFields)
         const res = await fetch(API_URL);
         const jsonData = await res.json();
         setData(jsonData);
         setFilteredData(jsonData);
 
         if (jsonData.length > 0) {
-          const allFields = Object.keys(jsonData[0]);
-          setFields(allFields);
-
-          // Detect date fields by checking if the first row's value parses as a valid date
-          const detectedDates = allFields.filter((field) => {
-            const val = jsonData[0][field];
-            return val && !isNaN(new Date(val).getTime());
-          });
-          setDateFields(detectedDates);
+          setFields(Object.keys(jsonData[0]));
         }
       } catch (err) {
         console.error("Error fetching data:", err);
@@ -48,11 +74,24 @@ const Table: React.FC = () => {
     fetchData();
   }, []);
 
+  // Sorting handler
+  const handleSort = (field: string) => {
+    const isAsc = orderBy === field && order === "asc";
+    setOrder(isAsc ? "desc" : "asc");
+    setOrderBy(field);
+
+    const sorted = [...filteredData].sort((a, b) => {
+      if (a[field] < b[field]) return isAsc ? -1 : 1;
+      if (a[field] > b[field]) return isAsc ? 1 : -1;
+      return 0;
+    });
+    setFilteredData(sorted);
+  };
+
   // Apply filters
-  useEffect(() => {
+  const applyFilters = () => {
     let temp = [...data];
 
-    // Text search filters
     if (searchName) {
       temp = temp.filter((row) =>
         String(row.name || "")
@@ -75,15 +114,12 @@ const Table: React.FC = () => {
       );
     }
 
-    // Date filtering — only for healthInsuranceExpiry
     if (startDate || endDate) {
-      const start = startDate ? new Date(startDate + "T00:00:00") : null;
-      const end = endDate ? new Date(endDate + "T23:59:59") : null;
-
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
       temp = temp.filter((row) => {
         if (!row.healthInsuranceExpiry) return false;
         const expiryDate = new Date(row.healthInsuranceExpiry);
-        if (isNaN(expiryDate.getTime())) return false;
         if (start && expiryDate < start) return false;
         if (end && expiryDate > end) return false;
         return true;
@@ -91,7 +127,8 @@ const Table: React.FC = () => {
     }
 
     setFilteredData(temp);
-  }, [searchName, searchEmail, searchPhone, startDate, endDate, data]);
+    setFilterOpen(false);
+  };
 
   // Delete row
   const handleDelete = async (phone: string) => {
@@ -101,202 +138,198 @@ const Table: React.FC = () => {
         method: "DELETE",
       });
       setData((prev) => prev.filter((row) => row.phone !== phone));
+      setFilteredData((prev) => prev.filter((row) => row.phone !== phone));
     } catch (err) {
       console.error("Delete error:", err);
     }
   };
 
-  // Start editing
+  // Open edit modal
   const handleEdit = (row: DataRow) => {
-    setEditRow(row);
-    setEditValues(row);
+    setCurrentRow(row);
+    setEditOpen(true);
   };
 
-  // Save changes
-  const handleSave = async () => {
-    if (!editRow) return;
+  // Save updated record
+  const handleSaveEdit = async () => {
+    if (!currentRow) return;
     try {
-      await fetch(
-        `https://form-backend-2024.onrender.com/update/${editRow.phone}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(editValues),
-        }
-      );
+      const res = await fetch(`${UPDATE_URL}/${currentRow.phone}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(currentRow),
+      });
+
+      if (!res.ok) throw new Error("Update failed");
+
+      const updatedRow = await res.json();
+
       setData((prev) =>
-        prev.map((r) => (r.phone === editRow.phone ? editValues : r))
+        prev.map((row) => (row.phone === updatedRow.phone ? updatedRow : row))
       );
-      setEditRow(null);
+      setFilteredData((prev) =>
+        prev.map((row) => (row.phone === updatedRow.phone ? updatedRow : row))
+      );
+
+      setEditOpen(false);
     } catch (err) {
       console.error("Update error:", err);
     }
   };
 
-  // Cancel editing
-  const handleCancel = () => {
-    setEditRow(null);
-    setEditValues({});
-  };
-
   if (loading) {
-    return <p className="text-gray-400 text-center py-4">Loading data...</p>;
+    return <p style={{ textAlign: "center" }}>Loading data...</p>;
   }
 
   return (
-    <div className="p-6 bg-gray-900  w-full text-gray-200">
-      <h2 className="text-2xl font-bold mb-4 text-center">API Data Table</h2>
+    <div style={{ padding: "20px" }}>
+      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
+        API Data Table
+      </h2>
 
-      {/* Search Fields */}
-      <div className="flex flex-wrap gap-4 mb-4">
-        <input
-          type="text"
-          placeholder="Search by Name..."
-          value={searchName}
-          onChange={(e) => setSearchName(e.target.value)}
-          className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200"
-        />
-        <input
-          type="text"
-          placeholder="Search by Email..."
-          value={searchEmail}
-          onChange={(e) => setSearchEmail(e.target.value)}
-          className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200"
-        />
-        <input
-          type="text"
-          placeholder="Search by Phone..."
-          value={searchPhone}
-          onChange={(e) => setSearchPhone(e.target.value)}
-          className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200"
-        />
-      </div>
+      {/* Filter Button */}
+      <Button
+        startIcon={<FilterList />}
+        variant="contained"
+        onClick={() => setFilterOpen(true)}
+        style={{ marginBottom: "16px" }}
+      >
+        Filters
+      </Button>
 
-      {/* Date Range */}
-      <div className="flex gap-4 mb-4">
-        <div></div>
-        <div>
-          <label className="block text-sm mb-1">
-            healthInsuranceExpiry Start Date
-          </label>
-          <input
+      {/* Filter Modal */}
+      <Dialog open={filterOpen} onClose={() => setFilterOpen(false)} fullWidth>
+        <DialogTitle>Apply Filters</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Search by Name"
+            fullWidth
+            margin="normal"
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+          />
+          <TextField
+            label="Search by Email"
+            fullWidth
+            margin="normal"
+            value={searchEmail}
+            onChange={(e) => setSearchEmail(e.target.value)}
+          />
+          <TextField
+            label="Search by Phone"
+            fullWidth
+            margin="normal"
+            value={searchPhone}
+            onChange={(e) => setSearchPhone(e.target.value)}
+          />
+          <TextField
             type="date"
+            fullWidth
+            margin="normal"
+            label="Start Date"
+            InputLabelProps={{ shrink: true }}
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200"
           />
-        </div>
-        <div>
-          <label className="block text-sm mb-1">End Date</label>
-          <input
+          <TextField
             type="date"
+            fullWidth
+            margin="normal"
+            label="End Date"
+            InputLabelProps={{ shrink: true }}
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="p-2 rounded bg-gray-800 border border-gray-700 text-gray-200"
           />
-        </div>
-      </div>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFilterOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={applyFilters}>
+            Apply
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Table */}
-      {fields.length > 0 ? (
-        <div className="overflow-x-auto w-full">
-          <table className="min-w-full w-full border border-gray-700 rounded-lg overflow-hidden">
-            <thead className="bg-gray-800">
-              <tr>
-                {fields.map((field) => (
-                  <th
-                    key={field}
-                    className="px-4 py-2 border-b border-gray-700 text-left text-gray-300"
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              {fields.map((field) => (
+                <TableCell key={field}>
+                  <TableSortLabel
+                    active={orderBy === field}
+                    direction={orderBy === field ? order : "asc"}
+                    onClick={() => handleSort(field)}
                   >
-                    {field}
-                  </th>
-                ))}
-                <th className="px-4 py-2 border-b border-gray-700 text-gray-300">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredData.map((row, idx) => (
-                <tr key={idx} className="hover:bg-gray-800 transition-colors">
-                  {fields.map((field) => (
-                    <td
-                      key={field}
-                      className="px-4 py-2 border-b border-gray-700"
-                    >
-                      {editRow?.phone === row.phone ? (
-                        <input
-                          type="text"
-                          value={editValues[field] ?? ""}
-                          onChange={(e) =>
-                            setEditValues({
-                              ...editValues,
-                              [field]: e.target.value,
-                            })
-                          }
-                          className="p-1 rounded bg-gray-700 border border-gray-600 text-gray-200 w-full"
-                        />
-                      ) : (
-                        String(row[field] ?? "")
-                      )}
-                    </td>
-                  ))}
-                  <td className="px-4 py-2 border-b border-gray-700 space-x-2">
-                    {editRow?.phone === row.phone ? (
-                      <>
-                        <button
-                          onClick={handleSave}
-                          className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={handleCancel}
-                          className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => handleEdit(row)}
-                          className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(row.phone)}
-                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                        >
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
+                    {formatHeader(field)}
+                  </TableSortLabel>
+                </TableCell>
               ))}
-              {filteredData.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={fields.length + 1}
-                    className="text-center text-gray-400 py-4"
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredData.map((row, idx) => (
+              <TableRow key={idx} hover>
+                {fields.map((field) => (
+                  <TableCell key={field}>{row[field]}</TableCell>
+                ))}
+                <TableCell>
+                  <IconButton color="primary" onClick={() => handleEdit(row)}>
+                    <Edit />
+                  </IconButton>
+                  <IconButton
+                    color="error"
+                    onClick={() => handleDelete(row.phone)}
                   >
-                    No matching records found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="text-gray-400 text-center">No data available</p>
-      )}
+                    <Delete />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+            {filteredData.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={fields.length + 1} align="center">
+                  No matching records found
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Edit Modal */}
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth>
+        <DialogTitle>Edit Record</DialogTitle>
+        <DialogContent>
+          {currentRow &&
+            fields.map((field) => (
+              <TextField
+                key={field}
+                label={formatHeader(field)}
+                fullWidth
+                margin="normal"
+                value={currentRow[field] || ""}
+                onChange={(e) =>
+                  setCurrentRow((prev) =>
+                    prev ? { ...prev, [field]: e.target.value } : prev
+                  )
+                }
+                disabled={field === "phone"} // lock phone
+              />
+            ))}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveEdit}>
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
 
-export default Table;
-
-
-
+export default DataTable;
